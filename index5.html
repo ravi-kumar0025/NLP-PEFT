@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PEFT: LoRA vs QLoRA vs Prefix-Tuning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,700;0,900;1,400&family=Ubuntu:wght@300;400;500;700&family=Ubuntu+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Blueprint sheet: cyanotype ground, chalk ink, one glowing signal colour per method */
+  --ground:#0b0e14;
+  --panel:rgba(17,21,30,.86);
+  --chalk:#e9f1fb;
+  --steel:#9aa7bd;
+  --mute:#8b97ab;
+  --dim:#2a3140;
+  --lora:#3fe0c5;
+  --qlora:#ffd23f;
+  --prefix:#ff6b8b;
+  --waste:#ff3d2e;
+  --display:"Merriweather",Georgia,serif;
+  --body:"Ubuntu","Segoe UI",Arial,sans-serif;
+  --mono:"Ubuntu Mono",Consolas,monospace;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --e5:cubic-bezier(.16,1,.3,1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#000;font-family:var(--body);color:var(--chalk);overflow:hidden}
+#viewport{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+@property --glow{syntax:'<color>';inherits:true;initial-value:#ffd23f}
+#stage{--glow:#ffd23f;width:1280px;height:720px;position:relative;overflow:hidden;transform-origin:center center;transition:--glow 1.2s var(--ease);
+  background:
+    radial-gradient(circle,rgba(190,200,220,.16) 1.1px,transparent 1.5px) 0 0/24px 24px,
+    linear-gradient(rgba(190,200,220,.035) 1px,transparent 1px) 0 0/120px 120px,
+    linear-gradient(90deg,rgba(190,200,220,.035) 1px,transparent 1px) 0 0/120px 120px,
+    linear-gradient(160deg,#10131a 0%,#0b0e14 55%,#08090d 100%)}
+#aura{position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse 60% 55% at 90% 6%,color-mix(in srgb,var(--glow) 20%,transparent),transparent 70%),radial-gradient(ellipse 50% 50% at 4% 100%,color-mix(in srgb,var(--glow) 12%,transparent),transparent 70%);
+  animation:drift 14s ease-in-out infinite alternate}
+@keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(-30px,18px) scale(1.05)}}
+#stage::before{content:"";position:absolute;inset:0;z-index:8;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+#stage::after{content:"";position:absolute;inset:-40px;z-index:9;pointer-events:none;opacity:.07;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain .6s steps(3) infinite}
+@keyframes grain{0%{transform:translate(0,0)}33%{transform:translate(-14px,9px)}66%{transform:translate(11px,-12px)}100%{transform:translate(0,0)}}
+#chrome{position:absolute;inset:0;z-index:6;pointer-events:none}
+#blades{position:absolute;inset:0;z-index:7;pointer-events:none}
+.slide{position:absolute;inset:0;padding:54px 76px 84px;display:flex;flex-direction:column;gap:18px;z-index:1;visibility:hidden;will-change:clip-path,transform}
+.slide.active{visibility:visible;z-index:3}
+.slide.leaving{visibility:visible;z-index:2}
+.slide{--accent:var(--qlora)}
+.slide.s-lora{--accent:var(--lora)}.slide.s-qlora{--accent:var(--qlora)}.slide.s-prefix{--accent:var(--prefix)}
+/* entrances */
+.slide.active .rv{animation:rise .8s var(--e5) both;animation-delay:calc(var(--i,0) * 90ms + 420ms)}
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.w{display:inline-block}
+.slide.active h2 .w,.slide.active h1 .w{animation:wrise .8s var(--e5) both;animation-delay:calc(var(--w) * 70ms + 160ms)}
+.slide.active .words .w{animation:wrise .6s var(--e5) both;animation-delay:calc(var(--w) * 28ms + 600ms)}
+@keyframes wrise{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
+.slide.active .ink{animation:ink 1.3s var(--ease) both;animation-delay:var(--d,.4s)}
+@keyframes ink{from{stroke-dasharray:1;stroke-dashoffset:1}to{stroke-dasharray:1;stroke-dashoffset:0}}
+.slide.active .flood{animation:flood .8s ease both;animation-delay:var(--d,1s)}
+@keyframes flood{from{fill-opacity:0;opacity:.0}to{opacity:1}}
+.slide.active .inktext{animation:inkt 2s ease both;animation-delay:var(--d,.3s)}
+@keyframes inkt{0%{stroke-dasharray:0 2400;fill-opacity:0}55%{stroke-dasharray:2400 0;fill-opacity:0}100%{stroke-dasharray:2400 0;fill-opacity:1}}
+.slide.active .growx{transform-box:fill-box;transform-origin:left center;animation:growx 1.2s var(--e5) both;animation-delay:var(--gd,.6s)}
+@keyframes growx{from{transform:scaleX(0)}}
+.flow{stroke-dasharray:8 7;animation:dash .9s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-30}}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .55s var(--e5) both}
+@keyframes pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:none}}
+.bloom{filter:drop-shadow(0 0 5px currentColor) drop-shadow(0 0 14px currentColor)}
+.glowpulse{animation:gp 2s ease-in-out infinite}
+@keyframes gp{0%,100%{filter:drop-shadow(0 0 3px rgba(63,224,197,.6))}50%{filter:drop-shadow(0 0 16px rgba(63,224,197,1))}}
+/* type */
+.eyebrow{font-family:var(--mono);font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);display:flex;gap:14px;align-items:center}
+.eyebrow .who{border:1.5px solid var(--accent);padding:1px 9px;font-weight:700;text-shadow:0 0 10px var(--accent)}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance;letter-spacing:-.005em}
+h2{font-size:36px;line-height:1.2;font-weight:700;max-width:1100px;position:relative;padding-bottom:18px}
+h2::after{content:"";position:absolute;left:0;bottom:0;width:80px;height:4px;background:var(--accent);box-shadow:0 0 12px var(--accent);transform-origin:left}
+.slide.active h2::after{animation:rule .7s var(--e5) both;animation-delay:.55s}
+@keyframes rule{from{transform:scaleX(0)}}
+h2 em{font-style:normal;color:var(--accent);text-shadow:0 0 16px color-mix(in srgb,var(--accent) 55%,transparent)}
+p{margin:0}
+.lead{font-size:21px;line-height:1.45;color:var(--mute);max-width:980px;font-weight:300}
+.grid{display:grid;gap:18px}
+.card{background:var(--panel);border:1px solid var(--dim);border-radius:3px;padding:16px 20px;position:relative}
+.card::before{content:"";position:absolute;left:-1px;top:-1px;width:10px;height:10px;border-left:2px solid var(--steel);border-top:2px solid var(--steel)}
+.card h3{font-family:var(--display);font-size:20px;font-weight:700;margin:0 0 8px;color:var(--chalk)}
+.card p,.card li{font-size:17px;line-height:1.45;color:#cdd5e2;font-weight:300}
+.card b{font-weight:500;color:var(--chalk)}
+.card.hl{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),0 0 26px color-mix(in srgb,var(--accent) 22%,transparent)}
+.card.hl::before{border-color:var(--accent)}
+ul{margin:0;padding-left:20px}
+li{margin:4px 0}
+li::marker{color:var(--accent)}
+.num{font-variant-numeric:tabular-nums}
+.big{font-family:var(--mono);font-weight:700;font-size:56px;line-height:1;color:var(--accent);letter-spacing:-.02em;text-shadow:0 0 18px color-mix(in srgb,var(--accent) 60%,transparent)}
+.cap{font-size:15px;color:var(--mute);margin-top:6px;line-height:1.35}
+.mono{font-family:var(--mono)}
+.eq{font-family:var(--mono);font-size:26px;background:var(--panel);border:1px solid var(--dim);border-left:4px solid var(--accent);padding:12px 20px;color:var(--chalk)}
+.tag{display:inline-block;font-family:var(--mono);font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--steel)}
+button,select,input{font-family:var(--body)}
+.btn{font-size:16px;padding:7px 14px;border-radius:2px;border:1.5px solid var(--accent);background:transparent;color:var(--chalk);cursor:pointer;font-weight:500;transition:background .2s,color .2s,box-shadow .2s}
+.btn:hover{box-shadow:0 0 12px color-mix(in srgb,var(--accent) 50%,transparent)}
+.btn[aria-pressed="true"],.btn.on{background:var(--accent);color:var(--ground);font-weight:700;box-shadow:0 0 14px color-mix(in srgb,var(--accent) 60%,transparent)}
+.btn:disabled{opacity:.3;cursor:default;box-shadow:none}
+.btn:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--qlora);outline-offset:2px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label{font-size:16px;color:var(--mute)}
+select{font-size:16px;padding:6px 8px;border-radius:2px;border:1px solid var(--dim);background:var(--ground);color:var(--chalk)}
+input[type=range]{width:280px;accent-color:var(--accent)}
+table.cmp{border-collapse:collapse;width:100%;font-size:16px}
+table.cmp th,table.cmp td{border-bottom:1px solid var(--dim);padding:8px 10px;text-align:left}
+table.cmp th{font-family:var(--display);font-size:18px}
+table.cmp th.l{color:var(--lora)}table.cmp th.q{color:var(--qlora)}table.cmp th.p{color:var(--prefix)}
+table.cmp td{color:#cfdcef;font-weight:300}table.cmp td:first-child{color:var(--mute);width:180px;font-family:var(--mono);font-size:15px}
+.slide.active table.cmp tbody tr{animation:rise .5s var(--e5) both;animation-delay:calc(var(--r) * 90ms + 700ms)}
+.good{color:#5ef0a6!important;font-weight:500!important}.bad{color:#ff7a6b!important;font-weight:500!important}
+.pfsteps{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.pfstep{display:flex;flex-direction:column;gap:3px;text-align:left;background:transparent;border:1px solid var(--dim);border-left:3px solid var(--dim);padding:7px 10px;cursor:pointer;color:var(--mute);font-family:var(--body);transition:border-color .25s,background .25s,box-shadow .25s}
+.pfstep b{font-family:var(--mono);font-size:15px;color:var(--chalk);font-weight:700}
+.pfstep span{font-size:13.5px;line-height:1.3;font-weight:300}
+.pfstep.done{border-left-color:color-mix(in srgb,var(--prefix) 55%,transparent)}
+.pfstep.on{border-color:var(--prefix);border-left-color:var(--prefix);background:rgba(255,107,139,.09);box-shadow:0 0 16px rgba(255,107,139,.25)}
+.pfstep.on b{color:var(--prefix)}
+.pfstep.on span{color:#dde3ec}
+.pfstep:focus-visible{outline:3px solid var(--qlora);outline-offset:2px}
+/* act cards */
+.act{justify-content:center}
+.act svg text.inktext{font-family:"Merriweather",Georgia,serif}
+.partlbl{font-family:var(--mono);font-size:18px;letter-spacing:.3em;color:var(--mute);margin-bottom:-8px}
+/* chrome */
+#tblock{position:absolute;right:22px;bottom:22px;z-index:6;display:flex;font-family:var(--mono);font-size:15px;background:rgba(11,14,20,.94);border:1.5px solid var(--dim)}
+#tblock span{padding:9px 14px;border-left:1.5px solid var(--dim);color:var(--mute)}
+#tblock span:first-child{border-left:0;color:var(--qlora);text-shadow:0 0 8px rgba(255,210,63,.6)}
+#help{position:fixed;top:10px;right:14px;color:#6f86a8;font:13px var(--mono);z-index:31;display:flex;gap:6px;align-items:center}
+#help button{background:#12161e;color:#e9f1fb;border:1px solid #2a3140;border-radius:2px;padding:5px 10px;font:14px var(--mono);cursor:pointer}
+#help button:hover{border-color:#9aa7bd}
+svg text{font-family:var(--body)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="help">← → · R replay<button id="prevBtn" type="button" aria-label="Previous slide">◀ Prev</button><button id="nextBtn" type="button" aria-label="Next slide">Next ▶</button><button id="fsBtn" type="button">Fullscreen</button></div>
+<div id="viewport"><div id="stage"><div id="aura"></div>
+
+<!-- 1 COVER -->
+<section class="slide" data-act="PEFT" data-time="0:20">
+  <div class="grid" style="grid-template-columns:1.7fr 1fr;align-items:center;flex:1">
+    <div class="grid" style="gap:14px">
+      <div class="eyebrow rv" style="--accent:var(--steel)"><span class="scr">CS3105 · Natural Language Processing · IIT Patna</span></div>
+      <svg viewBox="0 0 760 200" width="100%" role="img" aria-label="Parameter-Efficient Fine-Tuning">
+        <text class="inktext" x="0" y="80" font-family="Merriweather, Georgia, serif" font-weight="900" font-size="78" fill="#e9f1fb" stroke="#e9f1fb" stroke-width="1.6">Parameter-Efficient</text>
+        <text class="inktext" style="--d:.9s" x="0" y="178" font-family="Merriweather, Georgia, serif" font-weight="900" font-size="78" fill="#ffd23f" stroke="#ffd23f" stroke-width="1.6">Fine-Tuning</text>
+      </svg>
+      <p class="lead words" style="font-size:24px;color:#cdd5e2">A comparative analysis of LoRA, QLoRA and Prefix-Tuning for resource-constrained environments</p>
+      <div class="row rv" style="gap:12px;margin-top:18px;flex-wrap:nowrap">
+        <div class="card" style="flex:1;border-top:3px solid var(--lora)"><div class="tag">I · LoRA</div><h3 style="margin-top:8px" contenteditable="true">Member 1</h3></div>
+        <div class="card" style="flex:1;border-top:3px solid var(--qlora)"><div class="tag">II · QLoRA</div><h3 style="margin-top:8px" contenteditable="true">Member 2</h3></div>
+        <div class="card" style="flex:1;border-top:3px solid var(--prefix)"><div class="tag">III · Prefix</div><h3 style="margin-top:8px" contenteditable="true">Member 3</h3></div>
+      </div>
+    </div>
+    <svg viewBox="0 0 380 380" width="100%" role="img" aria-label="A large weight matrix approximated by two thin matrices">
+      <g id="titleGrid"></g>
+      <rect class="ink" style="--d:.6s" x="18" y="38" width="204" height="204" fill="none" stroke="#9aa7bd" stroke-width="2"/>
+      <text x="246" y="152" font-size="36" fill="#9aa7bd" text-anchor="middle">≈</text>
+      <rect class="ink bloom" style="--d:1.6s;color:#3fe0c5" x="276" y="38" width="20" height="204" fill="none" stroke="#3fe0c5" stroke-width="2.5"/>
+      <rect class="ink bloom" style="--d:2.1s;color:#3fe0c5" x="306" y="38" width="66" height="20" fill="none" stroke="#3fe0c5" stroke-width="2.5"/>
+      <text x="286" y="266" fill="#3fe0c5" font-family="Ubuntu Mono, monospace" font-size="18" font-weight="700" text-anchor="middle">B</text>
+      <text x="339" y="82" fill="#3fe0c5" font-family="Ubuntu Mono, monospace" font-size="18" font-weight="700" text-anchor="middle">A</text>
+      <line class="ink" style="--d:1s" x1="18" y1="290" x2="222" y2="290" stroke="#6b778c" stroke-width="1.5"/>
+      <text x="120" y="314" fill="#8b97ab" font-family="Ubuntu Mono, monospace" font-size="16" text-anchor="middle">ΔW · 16.8M numbers</text>
+      <text x="324" y="314" fill="#3fe0c5" font-family="Ubuntu Mono, monospace" font-size="16" text-anchor="middle">B×A · 65K</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 2 PROBLEM -->
+<section class="slide" data-act="THE PROBLEM" data-time="0:45">
+  <div class="eyebrow rv"><span class="scr">The problem</span></div>
+  <h2>Fully fine-tuning a 7B model needs about <em style="--accent:var(--waste)">112 GB</em> of GPU memory. A free Colab GPU has 16.</h2>
+  <div class="grid" style="grid-template-columns:1.4fr 1fr;align-items:start">
+    <div class="card rv">
+      <h3>Memory per trainable parameter</h3>
+      <svg viewBox="0 0 640 250" width="100%" role="img" aria-label="Full fine-tuning of a 7B model needs about 112 GB versus a 16 GB GPU">
+        <g font-family="Ubuntu Mono, monospace" font-size="15">
+          <rect class="growx" style="--gd:.7s" x="0" y="10" width="60" height="34" fill="#9aa7bd"/><rect class="growx" style="--gd:.85s" x="60" y="10" width="60" height="34" fill="#c3cbd8"/><rect class="growx" style="--gd:1s" x="120" y="10" width="120" height="34" fill="#dde3ec"/><rect class="growx" style="--gd:1.15s" x="240" y="10" width="240" height="34" fill="#e9f1fb"/>
+          <text x="30" y="32" fill="#0b0e14" text-anchor="middle" font-weight="700">2 B</text><text x="90" y="32" fill="#0b0e14" text-anchor="middle" font-weight="700">2 B</text><text x="180" y="32" fill="#0b0e14" text-anchor="middle" font-weight="700">4 B</text><text x="360" y="32" fill="#0b0e14" text-anchor="middle" font-weight="700">8 B</text>
+          <text x="0" y="64" fill="#8b97ab">weights</text><text x="62" y="64" fill="#8b97ab">grads</text><text x="122" y="64" fill="#8b97ab">fp32 master</text><text x="242" y="64" fill="#8b97ab">Adam moments m, v</text>
+          <text x="494" y="33" fill="#ffd23f" font-weight="700">= 16 bytes</text>
+        </g>
+        <g font-size="15">
+          <text x="0" y="120" fill="#e9f1fb" font-weight="500">7B model, full fine-tuning</text>
+          <rect class="growx bloom" style="--gd:1.4s;color:#ff3d2e" x="0" y="130" width="600" height="40" fill="#ff3d2e"/><text x="588" y="157" fill="#0b0e14" text-anchor="end" font-family="Ubuntu Mono, monospace" font-weight="700" font-size="18">~112 GB</text>
+          <text x="0" y="206" fill="#e9f1fb" font-weight="500">Colab T4 (free)</text>
+          <rect class="growx bloom" style="--gd:1.9s;color:#3fd0ff" x="0" y="216" width="86" height="30" fill="#3fd0ff"/><text x="96" y="237" fill="#3fd0ff" font-family="Ubuntu Mono, monospace" font-weight="700" font-size="18">16 GB</text>
+          <line class="ink" style="--d:2.2s" x1="86" y1="128" x2="86" y2="250" stroke="#ffd23f" stroke-width="2" stroke-dasharray="5 4"/>
+        </g>
+      </svg>
+    </div>
+    <div class="grid" style="gap:16px">
+      <div class="card rv" style="--accent:var(--waste)"><div class="big num" data-count="7" data-suffix="×">7×</div><div class="cap">more memory than the GPU we have, before counting activations</div></div>
+      <div class="card rv" style="--accent:var(--waste)"><div class="big num" data-count="14" data-suffix=" GB">14 GB</div><div class="cap">stored per task: full fine-tuning saves a whole new model copy for every task</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 PEFT MAP -->
+<section class="slide" data-act="THE IDEA" data-time="0:35">
+  <div class="eyebrow rv"><span class="scr">The idea</span></div>
+  <h2>PEFT freezes the pretrained model and trains <em style="--accent:var(--qlora)">under 1%</em> of the parameters</h2>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr);margin-top:4px">
+    <div class="card rv"><div class="tag">A · Additive</div><h3 style="margin-top:10px">Insert small new layers</h3><ul><li>Adapters (2019): within 0.4% of full FT on GLUE with 3.6% params</li><li>(IA)³ (2022): rescale activations, ~0.01% params</li></ul><p class="cap">Extra layers add inference latency</p></div>
+    <div class="card hl rv" style="--accent:var(--prefix)"><div class="tag">B · Soft prompts</div><h3 style="margin-top:10px">Learn vectors the model attends to</h3><ul><li><b style="color:var(--prefix)">Prefix-Tuning</b> (2021): every layer</li><li>Prompt Tuning (2021): input only</li></ul><p class="cap">Weights untouched; costs context length</p></div>
+    <div class="card hl rv" style="--accent:var(--lora)"><div class="tag">C · Reparameterized</div><h3 style="margin-top:10px">Learn a low-rank weight update</h3><ul><li><b style="color:var(--lora)">LoRA</b> (2021)</li><li><b style="color:var(--qlora)">QLoRA</b> (2023): LoRA on a 4-bit base</li><li>DoRA (2024): magnitude + direction</li></ul><p class="cap">Merges into the weights: zero added latency</p></div>
+  </div>
+  <p class="lead words" style="margin-top:2px">Our comparison: change the weights cheaply (LoRA, QLoRA) or leave them alone and change what attention sees (Prefix-Tuning).</p>
+</section>
+
+<!-- 4 ACT I -->
+<section class="slide act s-lora" data-act="I · LoRA" data-hook="act" data-time="0:08">
+  <div class="grid" style="grid-template-columns:1fr 1fr;align-items:center;flex:1">
+    <div>
+      <div class="partlbl">PART</div><svg viewBox="0 0 520 240" width="100%" role="img" aria-label="Part I"><text class="inktext" x="0" y="210" font-weight="900" font-size="250" font-family="Merriweather, Georgia, serif" fill="#3fe0c5" stroke="#3fe0c5" stroke-width="2" style="filter:drop-shadow(0 0 18px rgba(63,224,197,.55))">I</text></svg>
+      <h1 style="font-size:64px;font-weight:900;margin-top:-6px">LoRA</h1>
+      <p class="lead words" style="margin-top:12px">Low-rank updates · rank r · zero-latency merge</p>
+    </div>
+    <svg viewBox="0 0 480 360" width="100%" role="img" aria-label="Weight update split into B and A">
+      <g id="actGrid"></g>
+      <rect class="ink" style="--d:.5s" x="20" y="60" width="240" height="240" fill="none" stroke="#9aa7bd" stroke-width="2"/>
+      <text x="290" y="192" text-anchor="middle" font-size="34" fill="#9aa7bd">≈</text>
+      <rect class="ink bloom" style="--d:1.7s;color:#3fe0c5" x="320" y="60" width="22" height="240" fill="none" stroke="#3fe0c5" stroke-width="3"/>
+      <rect class="ink bloom" style="--d:2.2s;color:#3fe0c5" x="356" y="60" width="110" height="22" fill="none" stroke="#3fe0c5" stroke-width="3"/>
+      <text x="140" y="330" text-anchor="middle" fill="#8b97ab" font-family="Ubuntu Mono, monospace" font-size="17">W₀ frozen · d × k</text>
+      <text x="394" y="330" text-anchor="middle" fill="#3fe0c5" font-family="Ubuntu Mono, monospace" font-size="17" font-weight="700">B · A trained</text>
+      <text x="140" y="40" text-anchor="middle" fill="#8b97ab" font-family="Ubuntu Mono, monospace" font-size="15">❄ no gradients</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 5 LORA + slider -->
+<section class="slide s-lora" data-act="I · LoRA" data-hook="lora" data-time="1:20">
+  <div class="eyebrow rv"><span class="who">I</span><span class="scr">LoRA · Hu et al., 2021</span></div>
+  <h2>LoRA learns the weight update as two <em>thin matrices</em>, B × A</h2>
+  <div class="grid" style="grid-template-columns:1fr 1.15fr;align-items:start">
+    <div class="grid" style="gap:14px">
+      <div class="eq rv">h = W₀x + (α/r) · B A x</div>
+      <div class="card rv"><ul>
+        <li><b>W₀ frozen</b>; B is d×r, A is r×k, with r ≪ d, k</li>
+        <li>A random, <b>B = 0</b>: training starts at the pretrained model</li>
+        <li>Paper: attention W<sub>q</sub>, W<sub>v</sub>; modern practice: all linear layers</li>
+        <li>After training, <b>merge</b> W = W₀ + (α/r)BA: <b>zero</b> extra inference latency</li>
+      </ul></div>
+    </div>
+    <div class="card rv hl" id="rankCard">
+      <div class="row" style="justify-content:space-between">
+        <label for="dimSel">Matrix size d × k</label>
+        <select id="dimSel"><option value="768">768 × 768 (BERT-base)</option><option value="4096" selected>4096 × 4096 (7B LLM)</option><option value="8192">8192 × 8192 (65B LLM)</option></select>
+      </div>
+      <div class="row" style="margin-top:10px"><label for="rankR">Rank r</label><input id="rankR" type="range" min="0" max="8" step="1" value="3"><span id="rankVal" class="mono num" style="font-size:24px;font-weight:700;color:var(--lora);text-shadow:0 0 10px rgba(63,224,197,.6)">r = 8</span></div>
+      <svg id="rankSvg" viewBox="0 0 520 230" width="100%" role="img" aria-label="Full matrix versus low-rank factors B and A"></svg>
+      <div class="row" style="justify-content:space-between;margin-top:4px">
+        <div><div class="cap">Full update ΔW</div><div id="fullCount" class="mono num" style="font-size:21px"></div></div>
+        <div><div class="cap">LoRA trains r(d + k)</div><div id="loraCount" class="mono num" style="font-size:21px;color:var(--lora);font-weight:700"></div></div>
+        <div><div class="cap">Share trained</div><div id="loraPct" class="mono num" style="font-size:21px;color:var(--lora);font-weight:700"></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 LORA results -->
+<section class="slide s-lora" data-act="I · LoRA" data-time="0:45">
+  <div class="eyebrow rv"><span class="who">I</span><span class="scr">LoRA results on GPT-3 175B</span></div>
+  <h2>On GPT-3 175B, LoRA matched full fine-tuning while training <em>10,000× fewer</em> parameters</h2>
+  <div class="grid" style="grid-template-columns:repeat(4,1fr)">
+    <div class="card rv"><div class="big num" data-count="10000" data-suffix="×">10,000×</div><div class="cap">fewer trainable parameters</div></div>
+    <div class="card rv"><div class="big num" style="font-size:38px">1.2 TB→<span data-count="350" data-suffix=" GB">350 GB</span></div><div class="cap">training VRAM (no optimizer state for frozen weights)</div></div>
+    <div class="card rv"><div class="big num" style="font-size:38px">350 GB→<span data-count="35" data-suffix=" MB">35 MB</span></div><div class="cap">checkpoint per task (r = 4, W<sub>q</sub>, W<sub>v</sub>)</div></div>
+    <div class="card rv"><div class="big num" data-count="25" data-prefix="+" data-suffix="%">+25%</div><div class="cap">training throughput (43.1 vs 32.5 tokens/s per V100)</div></div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card rv hl"><h3>Rank 1 is already competitive</h3><p>With r = 1 on W<sub>q</sub> and W<sub>v</sub>, GPT-3 stayed competitive on WikiSQL and MultiNLI. The update a task needs has low intrinsic rank, which is why LoRA works.</p></div>
+    <div class="card rv"><h3>What LoRA leaves on the table</h3><p>The frozen base still sits in GPU memory at 16-bit: 14 GB for a 7B model, 130 GB for 65B. That is the next bottleneck.</p></div>
+  </div>
+</section>
+
+<!-- 7 ACT II -->
+<section class="slide act s-qlora" data-act="II · QLoRA" data-hook="act" data-time="0:08">
+  <div class="grid" style="grid-template-columns:1fr 1fr;align-items:center;flex:1">
+    <div>
+      <div class="partlbl">PART</div><svg viewBox="0 0 520 240" width="100%" role="img" aria-label="Part II"><text class="inktext" x="0" y="210" font-weight="900" font-size="250" font-family="Merriweather, Georgia, serif" fill="#ffd23f" stroke="#ffd23f" stroke-width="2" style="filter:drop-shadow(0 0 18px rgba(255,210,63,.5))">II</text></svg>
+      <h1 style="font-size:64px;font-weight:900;margin-top:-6px">QLoRA</h1>
+      <p class="lead words" style="margin-top:12px">4-bit NF4 · double quantization · paged optimizers</p>
+    </div>
+    <svg viewBox="0 0 480 360" width="100%" role="img" aria-label="Bell curve of weights with 16 quantization levels">
+      <path class="ink" style="--d:.5s" d="M20 300 H460" stroke="#6b778c" stroke-width="1.5" fill="none"/>
+      <path id="bell" class="ink" style="--d:.7s" d="" stroke="#e9f1fb" stroke-width="2.5" fill="none"/>
+      <g id="actLevels"></g>
+      <text x="240" y="336" text-anchor="middle" fill="#8b97ab" font-family="Ubuntu Mono, monospace" font-size="17">16 levels where the weights are</text>
+    </svg>
+  </div>
+</section>
+
+<!-- 8 QLORA idea -->
+<section class="slide s-qlora" data-act="II · QLoRA" data-time="0:45">
+  <div class="eyebrow rv"><span class="who">II</span><span class="scr">QLoRA · Dettmers et al., 2023</span></div>
+  <h2>QLoRA stores the frozen model in 4-bit: a 65B fine-tune drops from <em>780 GB to under 48 GB</em></h2>
+  <div class="card rv" style="padding:12px 22px">
+    <svg viewBox="0 0 1100 200" width="100%" role="img" aria-label="QLoRA forward pass: 4-bit base dequantized per layer plus 16-bit LoRA adapters">
+      <defs><marker id="qa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#9aa7bd"/></marker></defs>
+      <rect class="ink" style="--d:.6s" x="10" y="60" width="250" height="90" fill="rgba(255,210,63,.08)" stroke="#ffd23f" stroke-width="2"/>
+      <text x="135" y="95" text-anchor="middle" font-size="20" font-weight="500" fill="#e9f1fb">Frozen base W</text>
+      <text x="135" y="122" text-anchor="middle" font-size="16" fill="#ffd23f" font-family="Ubuntu Mono, monospace">stored in 4-bit NF4</text>
+      <path class="flow" d="M262 105H340" stroke="#9aa7bd" stroke-width="2" marker-end="url(#qa)"/>
+      <rect class="ink" style="--d:.9s" x="345" y="60" width="240" height="90" fill="none" stroke="#9aa7bd" stroke-width="1.5"/>
+      <text x="465" y="95" text-anchor="middle" font-size="20" font-weight="500" fill="#e9f1fb">Dequantize</text>
+      <text x="465" y="122" text-anchor="middle" font-size="16" fill="#8b97ab" font-family="Ubuntu Mono, monospace">to bf16, layer by layer</text>
+      <path class="flow" d="M587 105H665" stroke="#9aa7bd" stroke-width="2" marker-end="url(#qa)"/>
+      <rect class="ink" style="--d:1.2s" x="670" y="60" width="170" height="90" fill="none" stroke="#9aa7bd" stroke-width="1.5"/>
+      <text x="755" y="112" text-anchor="middle" font-size="22" font-weight="700" fill="#e9f1fb" font-family="Ubuntu Mono, monospace">X·W + X·BA</text>
+      <path class="flow" d="M842 105H910" stroke="#9aa7bd" stroke-width="2" marker-end="url(#qa)"/>
+      <text x="975" y="112" text-anchor="middle" font-size="20" font-weight="500" fill="#e9f1fb">output Y</text>
+      <rect class="ink bloom" style="--d:1.5s;color:#3fe0c5" x="670" y="4" width="170" height="38" fill="none" stroke="#3fe0c5" stroke-width="2"/>
+      <text x="755" y="29" text-anchor="middle" font-size="16" font-weight="700" fill="#3fe0c5" font-family="Ubuntu Mono, monospace">LoRA B, A · bf16</text>
+      <path class="flow" d="M755 44V58" stroke="#3fe0c5" stroke-width="2"/>
+      <circle r="7" fill="#ffd23f" class="bloom" style="color:#ffd23f"><animateMotion dur="2.6s" repeatCount="indefinite" path="M135 105H465H755H975"/></circle>
+      <circle r="5" fill="#3fe0c5" class="bloom" style="color:#3fe0c5"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M135 105H465H755H975"/></circle>
+      <circle r="6" fill="#ff6b8b" class="bloom" style="color:#ff6b8b"><animateMotion dur="2.2s" repeatCount="indefinite" path="M975 178H755V44"/></circle>
+      <path d="M975 178H760" stroke="#ff6b8b" stroke-width="1.5" stroke-dasharray="4 5" fill="none"/>
+      <text x="420" y="184" text-anchor="middle" font-size="16" fill="#ff6b8b">Backward pass: gradients flow through the frozen 4-bit model and update only B and A</text>
+    </svg>
+  </div>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="card rv"><div class="tag">01</div><h3 style="margin-top:8px">4-bit NormalFloat (NF4)</h3><p>16 levels at quantiles of a normal distribution, where pretrained weights actually lie</p></div>
+    <div class="card rv"><div class="tag">02</div><h3 style="margin-top:8px">Double Quantization</h3><p>Quantize the quantization constants too: saves ~0.37 bits per parameter</p></div>
+    <div class="card rv"><div class="tag">03</div><h3 style="margin-top:8px">Paged optimizers</h3><p>Optimizer states spill to CPU RAM on memory spikes instead of crashing</p></div>
+  </div>
+</section>
+
+<!-- 9 NF4 viz -->
+<section class="slide s-qlora" data-act="II · QLoRA" data-hook="nf4" data-time="1:00">
+  <div class="eyebrow rv"><span class="who">II</span><span class="scr">Idea 01 · NF4</span></div>
+  <h2>NF4 puts its 16 levels <em>where the weights are</em>: same 4 bits, less error</h2>
+  <div class="grid" style="grid-template-columns:1.6fr 1fr;align-items:start">
+    <div class="card rv">
+      <div class="row"><button class="btn" id="q-int4" type="button" aria-pressed="false">Int4 (evenly spaced)</button><button class="btn" id="q-nf4" type="button" aria-pressed="true">NF4 (normal quantiles)</button></div>
+      <canvas id="nf4Canvas" width="760" height="320" style="width:100%;height:auto;margin-top:10px" aria-label="Weight histogram with 4-bit quantization levels"></canvas>
+    </div>
+    <div class="grid" style="gap:14px">
+      <div class="card rv hl"><div class="cap" style="margin-top:0">Mean squared error (simulated)</div><div id="mseVal" class="big num" style="font-size:48px">–</div><div id="mseCmp" class="cap"></div></div>
+      <div class="card rv"><h3>Why it works</h3><p>Pretrained weights are roughly zero-centred and normal. Equal-probability bins give each of the 16 codes an equal share of the weights.</p></div>
+      <div class="card rv"><p class="cap" style="margin:0">NF4 beat FP4 and Int4 at 4 bits; with it QLoRA matched 16-bit LoRA on MMLU for 7B–65B LLaMA.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 QLORA details -->
+<section class="slide s-qlora" data-act="II · QLoRA" data-time="0:45">
+  <div class="eyebrow rv"><span class="who">II</span><span class="scr">Ideas 02 and 03 · what they bought</span></div>
+  <h2>With double quantization and paged optimizers, a 65B model trains on <em>one 48 GB GPU</em></h2>
+  <div class="grid" style="grid-template-columns:1fr 1fr">
+    <div class="card rv"><h3>Double Quantization</h3>
+      <p>One fp32 scale per block of 64 weights:</p>
+      <div class="mono num" style="font-size:21px;margin:6px 0">32 / 64 = 0.500 bits per weight</div>
+      <p>Quantize the scales to 8-bit, blocks of 256:</p>
+      <div class="mono num" style="font-size:21px;margin:6px 0;color:var(--qlora);font-weight:700;text-shadow:0 0 10px rgba(255,210,63,.5)">8/64 + 32/(64·256) = 0.127 bits</div>
+      <p class="cap">Saves 0.373 bits per parameter, about 3 GB on a 65B model</p>
+    </div>
+    <div class="grid" style="gap:14px">
+      <div class="card rv"><h3>Paged optimizers</h3><p>NVIDIA unified memory moves optimizer state to CPU RAM when a long batch spikes memory, then back. No out-of-memory crash.</p></div>
+      <div class="card rv hl"><h3>Finding: adapt all linear layers</h3><p>LoRA only on W<sub>q</sub>, W<sub>v</sub> fell short; LoRA on every linear layer matched full 16-bit fine-tuning.</p></div>
+    </div>
+  </div>
+  <div class="grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="card rv"><div class="big num" data-count="99.3" data-dec="1" data-suffix="%">99.3%</div><div class="cap">of ChatGPT's score on the Vicuna benchmark (Guanaco 65B)</div></div>
+    <div class="card rv"><div class="big num" data-count="24" data-suffix=" h">24 h</div><div class="cap">of fine-tuning on a single GPU</div></div>
+    <div class="card rv" style="--accent:var(--steel)"><div class="big num" style="text-shadow:none">Slower</div><div class="cap">Trade-off: each step dequantizes weights, so it trains slower than plain LoRA</div></div>
+  </div>
+</section>
+
+<!-- 11 MEMORY CALC -->
+<section class="slide s-qlora" data-act="II · QLoRA" data-hook="mem" data-time="1:00">
+  <div class="eyebrow rv"><span class="who">II</span><span class="scr">Resource-constrained view</span></div>
+  <h2>On a free 16 GB Colab GPU, only <em>QLoRA</em> comfortably fine-tunes a 7B model</h2>
+  <div class="card rv" style="flex:1;display:flex;flex-direction:column">
+    <div class="row" style="justify-content:space-between">
+      <div class="row"><span class="cap" style="margin:0">Model size</span>
+        <button class="btn msz" type="button" data-p="1">1B</button><button class="btn msz on" type="button" data-p="7">7B</button><button class="btn msz" type="button" data-p="13">13B</button><button class="btn msz" type="button" data-p="65">65B</button></div>
+      <div class="row mono" style="font-size:15px;color:var(--mute);gap:16px">
+        <span><span style="display:inline-block;width:14px;height:14px;background:#e9f1fb;vertical-align:-2px"></span> weights</span>
+        <span><span style="display:inline-block;width:14px;height:14px;background:#e9f1fb;opacity:.5;vertical-align:-2px"></span> grads + optimizer</span>
+        <span><span style="display:inline-block;width:14px;height:14px;background:#e9f1fb;opacity:.22;vertical-align:-2px"></span> activations</span>
+      </div>
+    </div>
+    <svg id="memSvg" viewBox="0 0 1100 330" width="100%" role="img" aria-label="Estimated GPU memory per method versus common GPUs"></svg>
+  </div>
+</section>
+
+<!-- 12 ACT III -->
+<section class="slide act s-prefix" data-act="III · PREFIX" data-hook="act" data-time="0:08">
+  <div class="grid" style="grid-template-columns:1fr 1fr;align-items:center;flex:1">
+    <div>
+      <div class="partlbl">PART</div><svg viewBox="0 0 520 240" width="100%" role="img" aria-label="Part III"><text class="inktext" x="0" y="210" font-weight="900" font-size="250" font-family="Merriweather, Georgia, serif" fill="#ff6b8b" stroke="#ff6b8b" stroke-width="2" style="filter:drop-shadow(0 0 18px rgba(255,107,139,.5))">III</text></svg>
+      <h1 style="font-size:64px;font-weight:900;margin-top:-6px">Prefix-Tuning</h1>
+      <p class="lead words" style="margin-top:12px">Virtual tokens · frozen weights · steering attention</p>
+    </div>
+    <svg viewBox="0 0 480 360" width="100%" role="img" aria-label="Prefix vectors that real tokens attend to">
+      <g font-family="Ubuntu Mono, monospace" font-size="15">
+        <rect class="ink bloom" style="--d:.5s;color:#ff6b8b" x="20" y="200" width="56" height="44" fill="none" stroke="#ff6b8b" stroke-width="2.5"/>
+        <rect class="ink bloom" style="--d:.65s;color:#ff6b8b" x="86" y="200" width="56" height="44" fill="none" stroke="#ff6b8b" stroke-width="2.5"/>
+        <rect class="ink bloom" style="--d:.8s;color:#ff6b8b" x="152" y="200" width="56" height="44" fill="none" stroke="#ff6b8b" stroke-width="2.5"/>
+        <text x="48" y="228" fill="#ff6b8b" text-anchor="middle" font-weight="700">P1</text><text x="114" y="228" fill="#ff6b8b" text-anchor="middle" font-weight="700">P2</text><text x="180" y="228" fill="#ff6b8b" text-anchor="middle" font-weight="700">P3</text>
+        <rect class="ink" style="--d:1s" x="228" y="200" width="70" height="44" fill="none" stroke="#9aa7bd" stroke-width="1.5"/>
+        <rect class="ink" style="--d:1.1s" x="308" y="200" width="70" height="44" fill="none" stroke="#9aa7bd" stroke-width="1.5"/>
+        <rect class="ink" style="--d:1.2s" x="388" y="200" width="70" height="44" fill="none" stroke="#9aa7bd" stroke-width="1.5"/>
+        <text x="263" y="228" fill="#cdd5e2" text-anchor="middle">the</text><text x="343" y="228" fill="#cdd5e2" text-anchor="middle">cat</text><text x="423" y="228" fill="#cdd5e2" text-anchor="middle">sat</text>
+        <path class="ink" style="--d:1.6s" d="M423 198 Q 235 40 48 198" fill="none" stroke="#ff6b8b" stroke-width="2"/>
+        <path class="ink" style="--d:1.8s" d="M423 198 Q 268 80 114 198" fill="none" stroke="#ff6b8b" stroke-width="2"/>
+        <path class="ink" style="--d:2s" d="M423 198 Q 302 120 180 198" fill="none" stroke="#ff6b8b" stroke-width="2"/>
+        <text x="114" y="280" fill="#ff6b8b" text-anchor="middle">learned · 0.1%</text>
+        <text x="343" y="280" fill="#8b97ab" text-anchor="middle">real tokens · frozen</text>
+      </g>
+    </svg>
+  </div>
+</section>
+
+<!-- 13 PREFIX -->
+<section class="slide s-prefix" data-act="III · PREFIX" data-hook="pf" data-time="1:15">
+  <div class="eyebrow rv"><span class="who">III</span><span class="scr">Prefix-Tuning · Li &amp; Liang, 2021</span></div>
+  <h2>Prefix-Tuning leaves every weight alone and learns <em>virtual tokens</em> each layer attends to</h2>
+  <div class="grid" style="grid-template-columns:1.35fr 1fr;align-items:start">
+    <div class="card rv hl">
+      <div class="row" style="justify-content:space-between"><span class="mono" style="font-size:15px;letter-spacing:.1em;color:var(--prefix)">HOW IT WORKS · 4 STEPS</span><div class="row"><button class="btn" id="pfPlay" type="button">▶ Play</button><button class="btn" id="pfPrev" type="button">Back</button><button class="btn on" id="pfNext" type="button">Next</button></div></div>
+      <svg id="pfSvg" viewBox="0 0 640 280" style="width:100%;max-height:200px;margin-top:6px" role="img" aria-label="Prefix vectors prepended to keys and values at every layer"></svg>
+      <div class="pfsteps">
+        <button type="button" class="pfstep" data-s="0"><b>1 · Freeze the model</b><span>Every layer's weights stay fixed; nothing in the LM is updated.</span></button>
+        <button type="button" class="pfstep" data-s="1"><b>2 · Add prefix vectors</b><span>Learned P<sub>K</sub>, P<sub>V</sub> are prepended to keys and values at every layer.</span></button>
+        <button type="button" class="pfstep" data-s="2"><b>3 · Tokens attend to them</b><span>Real tokens treat the prefix as extra context, which steers the output.</span></button>
+        <button type="button" class="pfstep" data-s="3"><b>4 · Train only the prefix</b><span>Gradients update just the prefix: about 0.1% of the parameters.</span></button>
+      </div>
+    </div>
+    <div class="grid" style="gap:12px">
+      <div class="eq rv" style="font-size:18px">Attn(xW<sub>q</sub>, [P<sub>K</sub>; xW<sub>k</sub>], [P<sub>V</sub>; xW<sub>v</sub>])</div>
+      <div class="card rv"><ul>
+        <li><b>0.1%</b> of parameters, ~<b>250K</b> per table-to-text task</li>
+        <li>Matched fine-tuning on table-to-text; <b>beat it in low-data</b> settings</li>
+        <li>Unstable alone: prefix made by an MLP, then the MLP is dropped</li>
+        <li>Mix prefixes from different tasks in <b>one batch</b></li>
+        <li class="bad">Uses up context positions; adds attention cost</li>
+      </ul></div>
+      <div class="card rv"><p class="cap" style="margin:0"><b>Prompt Tuning</b> (Lester et al., 2021): vectors at the input only; matched full model tuning only at 11B parameters.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 COMPARISON + PICKER -->
+<section class="slide" data-act="VERDICT" data-time="0:55">
+  <div class="eyebrow rv"><span class="scr">The verdict</span></div>
+  <h2>For constrained hardware: <span style="color:var(--qlora)">QLoRA</span> for memory, <span style="color:var(--lora)">LoRA</span> for speed, <span style="color:var(--prefix)">Prefix</span> for many-task serving</h2>
+  <div class="grid" style="grid-template-columns:1.55fr 1fr;align-items:start">
+    <div class="card rv" style="padding:8px 14px">
+      <table class="cmp">
+        <thead><tr><th></th><th class="l">LoRA</th><th class="q">QLoRA</th><th class="p">Prefix-Tuning</th></tr></thead>
+        <tbody>
+          <tr style="--r:0"><td>trains</td><td>Low-rank B, A</td><td>Same as LoRA</td><td>Prefix K, V vectors</td></tr>
+          <tr style="--r:1"><td>base weights</td><td>Frozen, 16-bit</td><td>Frozen, 4-bit NF4</td><td>Frozen, 16-bit</td></tr>
+          <tr style="--r:2"><td>gpu memory</td><td>Low</td><td class="good">Lowest</td><td>Low</td></tr>
+          <tr style="--r:3"><td>train speed</td><td class="good">Fast</td><td>Slower</td><td>Fast</td></tr>
+          <tr style="--r:4"><td>inference cost</td><td class="good">None (merge)</td><td class="good">None (merge)</td><td class="bad">Extra tokens</td></tr>
+          <tr style="--r:5"><td>vs full FT</td><td class="good">Matches</td><td class="good">Matches 16-bit</td><td>Close; weaker at scale</td></tr>
+          <tr style="--r:6"><td>stability</td><td class="good">High</td><td class="good">High</td><td class="bad">Sensitive</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card rv hl" id="picker" style="--accent:var(--qlora)">
+      <h3>Which should you use?</h3>
+      <div class="cap" style="margin:6px 0">GPU memory</div>
+      <div class="row"><button class="btn pk" type="button" data-q="gpu" data-v="16">≤ 16 GB</button><button class="btn pk" type="button" data-v="24" data-q="gpu">24 GB</button><button class="btn pk" type="button" data-v="80" data-q="gpu">80 GB</button></div>
+      <div class="cap" style="margin:10px 0 6px">Model size</div>
+      <div class="row"><button class="btn pk" type="button" data-q="model" data-v="1">≤ 1B</button><button class="btn pk" type="button" data-q="model" data-v="7">7B</button><button class="btn pk" type="button" data-q="model" data-v="65">30–70B</button></div>
+      <div class="cap" style="margin:10px 0 6px">Serving</div>
+      <div class="row"><button class="btn pk" type="button" data-q="tasks" data-v="one">One task</button><button class="btn pk" type="button" data-q="tasks" data-v="many">Many tasks, one model</button></div>
+      <div id="pickOut" style="margin-top:12px;font-size:19px;line-height:1.4;min-height:80px"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 16 TAKEAWAYS -->
+<section class="slide" data-act="TAKEAWAYS" data-time="0:35">
+  <div class="eyebrow rv"><span class="scr">Takeaways</span></div>
+  <h2>PEFT puts large-model fine-tuning on a <em style="--accent:var(--qlora)">student GPU</em></h2>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="card rv" style="border-top:3px solid var(--lora)"><h3 style="color:var(--lora)">LoRA</h3><p>Low-rank updates match full fine-tuning, train 10,000× fewer parameters and add zero inference latency. The default choice.</p></div>
+    <div class="card rv" style="border-top:3px solid var(--qlora)"><h3 style="color:var(--qlora)">QLoRA</h3><p>A 4-bit NF4 base with LoRA on all linear layers: 65B on one 48 GB GPU, 7B on a free Colab T4.</p></div>
+    <div class="card rv" style="border-top:3px solid var(--prefix)"><h3 style="color:var(--prefix)">Prefix-Tuning</h3><p>Smallest per-task storage and batchable across tasks, but less stable, costs context, and trails LoRA at scale.</p></div>
+  </div>
+  <div class="card rv"><h3>Where the field went next</h3>
+    <ul>
+      <li><b>DoRA</b> (2024): magnitude + direction, LoRA on the direction: +3.7 avg on LLaMA-7B commonsense reasoning over LoRA</li>
+      <li><b>(IA)³ / T-Few</b> (2022): PEFT beat GPT-3 175B in-context learning (72.4% vs 66.6%) at ~1,000× lower inference compute</li>
+      <li><b>LoRA Without Regret</b> (2025): LoRA on all layers matches full fine-tuning on small-to-medium datasets, at ~10× the learning rate</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 17 THANKS -->
+<section class="slide act" data-act="THANK YOU" data-time="0:10">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:10px">
+    <svg viewBox="0 0 900 200" width="80%" role="img" aria-label="Thank you"><text class="inktext" x="450" y="150" text-anchor="middle" font-family="Merriweather, Georgia, serif" font-weight="900" font-size="150" fill="#e9f1fb" stroke="#e9f1fb" stroke-width="2">Thank you.</text></svg>
+    <div class="row rv" style="gap:28px;font-family:var(--mono);font-size:22px">
+      <span style="color:var(--lora);text-shadow:0 0 12px rgba(63,224,197,.6)">I · LoRA</span>
+      <span style="color:var(--qlora);text-shadow:0 0 12px rgba(255,210,63,.6)">II · QLoRA</span>
+      <span style="color:var(--prefix);text-shadow:0 0 12px rgba(255,107,139,.6)">III · Prefix-Tuning</span>
+    </div>
+  </div>
+</section>
+
+<svg id="chrome" viewBox="0 0 1280 720" aria-hidden="true">
+  <rect x="22" y="22" width="1236" height="676" fill="none" stroke="#2a3140" stroke-width="1.5"/>
+  <g stroke="#9aa7bd" stroke-width="1.6"><path d="M10 22H34M22 10V34"/><path d="M1246 22H1270M1258 10V34"/><path d="M10 698H34M22 686V710"/><path d="M1246 698H1270M1258 686V710"/></g>
+</svg>
+<svg id="blades" viewBox="0 0 1280 720" aria-hidden="true"><defs><filter id="edgeBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="10"/></filter></defs><g id="sweep" opacity="0"><line id="sweepGlow" stroke-width="26" filter="url(#edgeBlur)" opacity=".7"/><line id="sweepLine" stroke-width="3"/></g></svg>
+<div id="tblock"><span id="tbAct">PEFT</span><span id="tbSheet">SHEET 01 / 17</span><span id="timer" class="num">00:00</span></div>
+</div></div>
+
+<script>
+(function(){
+  const PAL={ground:'#0b0e14',chalk:'#e9f1fb',steel:'#9aa7bd',mute:'#8b97ab',dim:'#2a3140',lora:'#3fe0c5',qlora:'#ffd23f',prefix:'#ff6b8b',waste:'#ff3d2e',cold:'#3fd0ff'};
+  const RM=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const slides=[...document.querySelectorAll('.slide')];
+  const stage=document.getElementById('stage');
+  const NS='http://www.w3.org/2000/svg';
+  function el(tag,attrs,text){const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(text!==undefined)n.textContent=text;return n;}
+  const fmt=n=>n.toLocaleString('en-US');
+  let cur=-1,t0=null;
+  const hooks={};
+
+  // prep: indices, word splitting, pathLength for inked strokes
+  slides.forEach(s=>s.querySelectorAll('.rv').forEach((e,i)=>e.style.setProperty('--i',i)));
+  function splitWords(root){let i=0;const walk=n=>{[...n.childNodes].forEach(c=>{if(c.nodeType===3){const parts=c.textContent.split(/(\s+)/),fr=document.createDocumentFragment();parts.forEach(p=>{if(!p)return;if(/^\s+$/.test(p))fr.appendChild(document.createTextNode(p));else{const s=document.createElement('span');s.className='w';s.style.setProperty('--w',i++);s.textContent=p;fr.appendChild(s);}});c.replaceWith(fr);}else if(c.nodeType===1&&!c.classList.contains('w')&&c.tagName!=='SUB')walk(c);});};walk(root);}
+  document.querySelectorAll('.slide h2, .slide h1, .words').forEach(splitWords);
+  function prepInk(root){root.querySelectorAll('.ink').forEach(e=>e.setAttribute('pathLength','1'));}
+  prepInk(document);
+
+  function fit(){const s=Math.min(innerWidth/1280,innerHeight/720)||0.5;stage.style.transform='scale('+s+')';}
+  addEventListener('resize',fit);fit();
+
+  function countUp(root){
+    root.querySelectorAll('[data-count]').forEach(e=>{
+      const to=parseFloat(e.dataset.count),dec=+(e.dataset.dec||0),pre=e.dataset.prefix||'',suf=e.dataset.suffix||'';
+      const f=v=>pre+v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec})+suf;
+      if(RM){e.textContent=f(to);return;}
+      const st=performance.now()+650,dur=1400;
+      (function step(n){const k=Math.min(1,Math.max(0,(n-st)/dur)),v=to*(1-Math.pow(1-k,3));e.textContent=f(v);if(k<1)requestAnimationFrame(step);else e.textContent=f(to);})(performance.now());
+    });
+  }
+  const GLY='ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#%&+=<>/';
+  function scramble(root){
+    root.querySelectorAll('.scr').forEach(e=>{
+      const fin=e.dataset.fin||(e.dataset.fin=e.textContent);if(RM){e.textContent=fin;return;}
+      const st=performance.now()+150,dur=750,n=fin.length;
+      (function step(t){const p=Math.min(1,Math.max(0,(t-st)/dur));let out='';for(let i=0;i<n;i++){const ch=fin[i];if(ch===' '||ch==='·'){out+=ch;continue;}const q=p*1.6-i/n*.6;out+=q>=1?ch:q<=0?' ':GLY[(Math.floor(t/40)+i*7)%GLY.length];}e.textContent=out;if(p<1)requestAnimationFrame(step);else e.textContent=fin;})(performance.now());
+    });
+  }
+
+  // diagonal sweep transition with a glowing edge in the part colour
+  let swRaf=null,leaving=null;
+  const sw=document.getElementById('sweep'),swG=document.getElementById('sweepGlow'),swL=document.getElementById('sweepLine');
+  function cleanupLeaving(){if(leaving){leaving.classList.remove('leaving');leaving.style.transform='';leaving.style.filter='';leaving.style.clipPath='';leaving=null;}sw.setAttribute('opacity',0);}
+  function sweep(inS,outS,dir,col){
+    if(swRaf)cancelAnimationFrame(swRaf);cleanupLeaving();
+    if(RM||!outS){inS.style.clipPath='none';inS.style.transform='';return;}
+    leaving=outS;outS.classList.add('leaving');
+    swG.setAttribute('stroke',col);swL.setAttribute('stroke',col);
+    const st=performance.now(),D=900,sk=300,io=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+    (function f(n){const k=Math.min(1,(n-st)/D),e=io(k),pos=-sk+e*(1280+2*sk);
+      let xt,xb,poly;
+      let rest;
+      if(dir>0){xt=pos+sk/2;xb=pos-sk/2;poly=[[0,0],[xt,0],[xb,720],[0,720]];rest=[[xt,0],[1400,0],[1400,720],[xb,720]];}
+      else{const q=1280-pos;xt=q-sk/2;xb=q+sk/2;poly=[[xt,0],[1280,0],[1280,720],[xb,720]];rest=[[-120,0],[xt,0],[xb,720],[-120,720]];}
+      outS.style.clipPath='polygon('+rest.map(p=>p[0].toFixed(1)+'px '+p[1]+'px').join(',')+')';
+      inS.style.clipPath='polygon('+poly.map(p=>p[0].toFixed(1)+'px '+p[1]+'px').join(',')+')';
+      inS.style.transform='translateX('+((1-e)*40*dir).toFixed(1)+'px)';
+      outS.style.transform='translateX('+(-e*60*dir).toFixed(1)+'px) scale('+(1-.04*e)+')';outS.style.filter='brightness('+(1-.65*e)+') blur('+(e*2).toFixed(2)+'px)';
+      [swG,swL].forEach(l=>{l.setAttribute('x1',xt);l.setAttribute('y1',-10);l.setAttribute('x2',xb);l.setAttribute('y2',730);});
+      sw.setAttribute('opacity',Math.min(1,Math.sin(k*Math.PI)*1.6).toFixed(3));
+      if(k<1)swRaf=requestAnimationFrame(f);else{inS.style.clipPath='none';inS.style.transform='';cleanupLeaving();swRaf=null;}
+    })(st);
+  }
+  function show(i,replay){
+    i=Math.max(0,Math.min(slides.length-1,i));if(i===cur&&!replay)return;
+    const dir=i>=cur?1:-1,prev=cur>=0&&i!==cur?slides[cur]:null;cur=i;
+    const s=slides[cur];
+    slides.forEach((x,k)=>{if(k!==cur)x.classList.remove('active');});
+    s.classList.remove('active');void s.offsetWidth;s.classList.add('active');
+    const acc=getComputedStyle(s).getPropertyValue('--accent').trim()||PAL.qlora;stage.style.setProperty('--glow',acc);sweep(s,prev,dir,acc);
+    document.getElementById('tbAct').textContent=s.dataset.act||'';
+    document.getElementById('tbSheet').textContent='SHEET '+String(cur+1).padStart(2,'0')+' / '+slides.length;
+    try{const h='slide-'+(cur+1);if(location.hash!=='#'+h)history.replaceState(null,'','#'+h);}catch(err){}
+    if(cur>0&&t0===null)t0=Date.now();
+    countUp(s);scramble(s);
+    const hk=s.dataset.hook;if(hk&&hooks[hk]){try{hooks[hk](s);}catch(err){}}
+  }
+  function fromHash(){let hs='';try{hs=location.hash;}catch(err){}const m=/^#slide-(\d+)$/.exec(hs);return m?parseInt(m[1],10)-1:0;}
+  addEventListener('hashchange',()=>{const i=fromHash();if(i!==cur)show(i);});
+  addEventListener('keydown',e=>{
+    if(e.target.isContentEditable||e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+    if(['ArrowRight','PageDown',' ','Enter'].includes(e.key)){e.preventDefault();show(cur+1);}
+    else if(['ArrowLeft','PageUp','Backspace'].includes(e.key)){e.preventDefault();show(cur-1);}
+    else if(e.key==='Home')show(0);else if(e.key==='End')show(slides.length-1);
+    else if(e.key==='f'||e.key==='F')fs();
+    else if(e.key==='r'||e.key==='R')show(cur,true);
+    else if(e.key==='t'||e.key==='T')t0=Date.now();
+  });
+  function fs(){try{if(!document.fullscreenElement){const p=document.documentElement.requestFullscreen();if(p&&p.catch)p.catch(()=>{});}else document.exitFullscreen();}catch(err){}}
+  document.getElementById('fsBtn').addEventListener('click',fs);
+  document.getElementById('prevBtn').addEventListener('click',()=>show(cur-1));
+  document.getElementById('nextBtn').addEventListener('click',()=>show(cur+1));
+  document.addEventListener('pointerdown',()=>{try{window.focus();}catch(err){}});
+  let tx=null;stage.addEventListener('touchstart',e=>{tx=e.touches[0].clientX;},{passive:true});
+  stage.addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>60)show(cur+(dx<0?1:-1));tx=null;});
+  setInterval(()=>{if(t0===null)return;const s=Math.floor((Date.now()-t0)/1000);const e=document.getElementById('timer');e.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');e.style.color=s>720?PAL.waste:'';},500);
+
+  // cover + act I grids
+  function cellGrid(id,x0,y0,n,sz,gap){const g=document.getElementById(id);for(let i=0;i<n;i++)for(let j=0;j<n;j++){const r=el('rect',{x:x0+j*(sz+gap),y:y0+i*(sz+gap),width:sz,height:sz,fill:'#33405a'});r.style.opacity=(.15+.5*Math.abs(Math.sin(i*1.7+j*.9))).toFixed(2);g.appendChild(r);}}
+  cellGrid('titleGrid',22,42,10,18,2);cellGrid('actGrid',24,64,12,18,1.8);
+  // act II bell + levels
+  (function(){const pts=[];for(let i=0;i<=120;i++){const x=-3.2+i*6.4/120,y=Math.exp(-x*x/2);pts.push((240+x*68).toFixed(1)+' '+(300-y*220).toFixed(1));}document.getElementById('bell').setAttribute('d','M'+pts.join(' L'));
+    const NF=[-1,-.696,-.525,-.395,-.284,-.185,-.091,0,.08,.161,.246,.338,.441,.563,.723,1],g=document.getElementById('actLevels');
+    NF.forEach((v,i)=>{const x=240+v*2.4*68,ln=el('line',{x1:x,x2:x,y1:70,y2:300,stroke:PAL.qlora,'stroke-width':2,class:'ink bloom'});ln.style.setProperty('--d',(1.4+i*.06).toFixed(2)+'s');ln.style.color=PAL.qlora;g.appendChild(ln);});prepInk(g);})();
+  hooks.act=()=>{};
+
+  // LoRA rank widget
+  const ranks=[1,2,4,8,16,32,64,128,256];
+  const rankR=document.getElementById('rankR'),dimSel=document.getElementById('dimSel'),rsvg=document.getElementById('rankSvg');
+  function drawRank(){
+    const r=ranks[+rankR.value],d=+dimSel.value,k=d;
+    document.getElementById('rankVal').textContent='r = '+r;
+    const full=d*k,lo=r*(d+k),pct=lo/full*100;
+    document.getElementById('fullCount').textContent=fmt(full);
+    document.getElementById('loraCount').textContent=fmt(lo);
+    document.getElementById('loraPct').textContent=(pct<0.1?pct.toFixed(3):pct<1?pct.toFixed(2):pct.toFixed(1))+'%';
+    rsvg.innerHTML='';
+    const S=180,rw=Math.max(4,r*S/d);
+    for(let i=0;i<12;i++)for(let j=0;j<12;j++)rsvg.appendChild(el('rect',{x:10+j*15,y:20+i*15,width:14,height:14,fill:'#33405a','fill-opacity':(.25+.45*Math.abs(Math.sin(i*1.3+j*.7))).toFixed(2)}));
+    rsvg.appendChild(el('rect',{x:10,y:20,width:S,height:S,fill:'none',stroke:PAL.steel,'stroke-width':1.5}));
+    rsvg.appendChild(el('text',{x:10+S/2,y:20+S/2+8,'text-anchor':'middle','font-size':24,fill:PAL.chalk,'font-family':'Merriweather, serif','font-weight':900},'ΔW'));
+    rsvg.appendChild(el('text',{x:10+S/2,y:20+S+22,'text-anchor':'middle','font-size':15,fill:PAL.mute,'font-family':'Ubuntu Mono, monospace'},d+' × '+k));
+    rsvg.appendChild(el('text',{x:228,y:20+S/2+8,'text-anchor':'middle','font-size':28,fill:PAL.steel},'≈'));
+    const bx=260;
+    const B=el('rect',{x:bx,y:20,width:rw,height:S,fill:PAL.lora,class:'glowpulse'});rsvg.appendChild(B);
+    rsvg.appendChild(el('text',{x:bx+rw/2,y:20+S+22,'text-anchor':'middle','font-size':16,fill:PAL.lora,'font-weight':700,'font-family':'Ubuntu Mono, monospace'},'B'));
+    rsvg.appendChild(el('text',{x:bx+rw+18,y:20+S/2+8,'text-anchor':'middle','font-size':22,fill:PAL.steel},'×'));
+    const ax=bx+rw+36;
+    rsvg.appendChild(el('rect',{x:ax,y:20+S/2-rw/2,width:S,height:rw,fill:'#9ff3e4',class:'glowpulse'}));
+    rsvg.appendChild(el('text',{x:ax+S/2,y:20+S/2-rw/2-8,'text-anchor':'middle','font-size':16,fill:'#9ff3e4','font-weight':700,'font-family':'Ubuntu Mono, monospace'},'A ('+r+' × '+k+')'));
+  }
+  rankR.addEventListener('input',drawRank);dimSel.addEventListener('change',drawRank);drawRank();
+  let sweepT=null;
+  hooks.lora=()=>{if(RM)return;clearInterval(sweepT);let v=8;rankR.value=v;drawRank();
+    setTimeout(()=>{sweepT=setInterval(()=>{v--;rankR.value=v;drawRank();if(v<=3)clearInterval(sweepT);},260);},1000);};
+
+  // NF4 visualizer
+  const NF4=[-1,-0.6961928009986877,-0.5250730514526367,-0.39491748809814453,-0.28444138169288635,-0.18477343022823334,-0.09105003625154495,0,0.07958029955625534,0.16093020141124725,0.24611230194568634,0.33791524171829224,0.44070982933044434,0.5626170039176941,0.7229568362236023,1];
+  const INT4=[];for(let i=0;i<16;i++)INT4.push(-1+i*2/15);
+  let seed=12345;function rnd(){seed=(seed*1103515245+12345)%2147483648;return seed/2147483648;}
+  const W=[];for(let i=0;i<64*400;i++){const u=Math.max(rnd(),1e-9),v=rnd();W.push(Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v));}
+  function mse(levels){let e=0,am=0;for(let b=0;b<W.length;b+=64){let m=0;for(let i=b;i<b+64;i++)m=Math.max(m,Math.abs(W[i]));am+=m;for(let i=b;i<b+64;i++){const x=W[i]/m;let best=levels[0];for(const l of levels)if(Math.abs(l-x)<Math.abs(best-x))best=l;const d=(best-x)*m;e+=d*d;}}return {e:e/W.length,am:am/(W.length/64)};}
+  const mI=mse(INT4),mN=mse(NF4);
+  const R=3.2,bins=80,cnt=new Array(bins).fill(0);
+  for(const x of W){const b=Math.floor((x+R)/(2*R)*bins);if(b>=0&&b<bins)cnt[b]++;}
+  const cmax=Math.max(...cnt);
+  let mode='nf4',lv=NF4.slice(),grow=1;
+  function paintNF4(){
+    const c=document.getElementById('nf4Canvas'),g=c.getContext('2d'),w=c.width,h=c.height;
+    g.clearRect(0,0,w,h);
+    const base=h-40,X=v=>30+(v+R)/(2*R)*(w-60);
+    g.strokeStyle='rgba(170,185,210,.10)';g.lineWidth=1;for(let gy=base;gy>20;gy-=40){g.beginPath();g.moveTo(30,gy);g.lineTo(w-30,gy);g.stroke();}
+    for(let i=0;i<bins;i++){const bh=cnt[i]/cmax*(base-40)*grow;g.fillStyle='#33405a';g.fillRect(X(-R+i*2*R/bins)+1,base-bh,(w-60)/bins-2,bh);}
+    const colr=mode==='nf4'?PAL.qlora:PAL.steel;
+    g.shadowColor=colr;g.shadowBlur=mode==='nf4'?12:0;g.strokeStyle=colr;g.lineWidth=2.5;
+    for(const l of lv){const x=X(l*mI.am);g.beginPath();g.moveTo(x,20);g.lineTo(x,base);g.stroke();}
+    g.shadowBlur=0;
+    g.fillStyle=PAL.chalk;g.font='15px "Ubuntu Mono", monospace';g.textAlign='center';
+    for(const v of [-3,-2,-1,0,1,2,3])g.fillText(String(v),X(v),base+20);
+    g.fillStyle=PAL.mute;g.fillText('weight value (σ) · lines = the 16 four-bit levels for a typical block',w/2,h-4);
+  }
+  function setMode(m){
+    mode=m;const from=lv.slice(),to=m==='nf4'?NF4:INT4,st=performance.now();
+    (function step(n){const k=RM?1:Math.min(1,(n-st)/700),e=1-Math.pow(1-k,3);lv=from.map((v,i)=>v+(to[i]-v)*e);paintNF4();if(k<1)requestAnimationFrame(step);else{lv=to.slice();paintNF4();}})(st);
+    const val=m==='nf4'?mN.e:mI.e,mv=document.getElementById('mseVal');
+    mv.textContent=val.toFixed(4);mv.style.color=m==='nf4'?PAL.qlora:PAL.steel;
+    document.getElementById('mseCmp').textContent=m==='nf4'?('NF4 error is '+Math.round((1-mN.e/mI.e)*100)+'% lower than Int4 on these weights'):'Many Int4 levels sit in the sparse tails';
+    document.getElementById('q-nf4').setAttribute('aria-pressed',m==='nf4');document.getElementById('q-int4').setAttribute('aria-pressed',m==='int4');
+  }
+  document.getElementById('q-nf4').addEventListener('click',()=>setMode('nf4'));
+  document.getElementById('q-int4').addEventListener('click',()=>setMode('int4'));
+  setMode('nf4');
+  if(document.fonts&&document.fonts.ready)document.fonts.ready.then(paintNF4);
+  hooks.nf4=()=>{if(RM){grow=1;paintNF4();return;}const st=performance.now()+600;grow=0;paintNF4();(function step(n){const k=Math.min(1,Math.max(0,(n-st)/1000));grow=1-Math.pow(1-k,3);paintNF4();if(k<1)requestAnimationFrame(step);})(performance.now());};
+
+  // Memory calculator
+  let P=7;const msvg=document.getElementById('memSvg');
+  const gpus=[{n:'Colab T4',v:16},{n:'RTX 4090',v:24},{n:'A6000',v:48},{n:'A100',v:80}];
+  const meth=[{n:'Full fine-tuning',c:PAL.waste},{n:'LoRA',c:PAL.lora},{n:'QLoRA',c:PAL.qlora},{n:'Prefix-Tuning',c:PAL.prefix}];
+  function target(p){const act=1+0.04*p,f=0.006;return [[2*p,14*p,act],[2*p,16*f*p,act],[0.6*p,16*f*p,act],[2*p,16*0.001*p,act*1.15]];}
+  let memCur=target(7),memMax=Math.max(...memCur.map(r=>r[0]+r[1]+r[2]));
+  function paintMem(vals,maxv){
+    msvg.innerHTML='';const L=190,Wd=760,X=v=>L+v/maxv*Wd;
+    gpus.forEach((g,gi)=>{if(g.v>maxv)return;const x=X(g.v);msvg.appendChild(el('line',{x1:x,x2:x,y1:14,y2:290,stroke:PAL.cold,'stroke-dasharray':'5 4','stroke-width':1.5,opacity:.8}));msvg.appendChild(el('text',{x:x,y:gi%2?322:306,'text-anchor':'middle','font-size':14,fill:PAL.cold,'font-family':'Ubuntu Mono, monospace'},g.n+' '+g.v+' GB'));});
+    vals.forEach((r,i)=>{const y=20+i*68,m=meth[i];
+      msvg.appendChild(el('text',{x:L-14,y:y+30,'text-anchor':'end','font-size':19,'font-weight':700,fill:m.c},m.n));
+      let x=L;[[r[0],1],[r[1],.5],[r[2],.22]].forEach(([v,o])=>{const w=v/maxv*Wd;msvg.appendChild(el('rect',{x:x,y:y+8,width:Math.max(0,w),height:34,fill:m.c,'fill-opacity':o}));x+=w;});
+      const t=r[0]+r[1]+r[2];
+      msvg.appendChild(el('text',{x:x+10,y:y+32,'font-size':19,'font-weight':700,fill:PAL.chalk,'font-family':'Ubuntu Mono, monospace'},(t<10?t.toFixed(1):Math.round(t))+' GB'));
+    });
+  }
+  function animMem(fromZero){
+    const to=target(P),from=fromZero?to.map(r=>r.map(()=>0)):memCur.map(r=>r.slice());
+    const toMax=Math.max(...to.map(r=>r[0]+r[1]+r[2])),fromMax=fromZero?toMax:memMax,st=performance.now();
+    (function step(n){const k=RM?1:Math.min(1,(n-st)/900),e=1-Math.pow(1-k,3);
+      memCur=from.map((r,i)=>r.map((v,j)=>v+(to[i][j]-v)*e));memMax=fromMax+(toMax-fromMax)*e;paintMem(memCur,memMax);if(k<1)requestAnimationFrame(step);})(st);
+  }
+  document.querySelectorAll('.msz').forEach(b=>b.addEventListener('click',()=>{P=+b.dataset.p;document.querySelectorAll('.msz').forEach(x=>x.classList.toggle('on',x===b));animMem(false);}));
+  paintMem(memCur,memMax);
+  hooks.mem=()=>setTimeout(()=>animMem(true),600);
+
+  // Prefix animation
+  let pf=0,pfTimer=null;const pfs=document.getElementById('pfSvg');
+    function drawPf(isNew){
+    pfs.innerHTML='';document.querySelectorAll('.pfstep').forEach(b=>{const k=+b.dataset.s;b.classList.toggle('on',k===pf);b.classList.toggle('done',k<pf);b.setAttribute('aria-pressed',k===pf);});
+    const toks=['name:','Starbucks','|','type:','cafe'];
+    [3,2,1].forEach((L,li)=>{const y=22+li*92;
+      pfs.appendChild(el('rect',{x:150,y:y,width:470,height:64,fill:'rgba(16,20,28,.92)',stroke:PAL.dim,'stroke-width':1.5}));
+      pfs.appendChild(el('text',{x:16,y:y+28,'font-size':16,'font-weight':700,fill:PAL.chalk,'font-family':'Ubuntu Mono, monospace'},'LAYER '+L));
+      pfs.appendChild(el('text',{x:16,y:y+48,'font-size':13,fill:PAL.mute},'❄ frozen weights'));
+      toks.forEach((t,i)=>{const x=264+i*70;pfs.appendChild(el('rect',{x:x,y:y+16,width:62,height:32,fill:'#151b26',stroke:'#3a465c'}));pfs.appendChild(el('text',{x:x+31,y:y+37,'text-anchor':'middle','font-size':12,fill:'#cdd5e2','font-family':'Ubuntu Mono, monospace'},t));});
+      if(pf>=1){for(let j=0;j<3;j++){const x=160+j*32,g=el('g',{class:isNew&&pf===1?'pop':''});if(isNew&&pf===1)g.style.animationDelay=(li*120+j*70)+'ms';if(pf===3){g.setAttribute('class','bloom');g.style.color=PAL.prefix;}
+        g.appendChild(el('rect',{x:x,y:y+16,width:26,height:32,fill:pf>=3?PAL.prefix:'rgba(255,107,139,.12)',stroke:PAL.prefix,'stroke-width':pf>=3?2.5:1.5}));
+        g.appendChild(el('text',{x:x+13,y:y+37,'text-anchor':'middle','font-size':12,fill:pf>=3?PAL.ground:PAL.prefix,'font-weight':700,'font-family':'Ubuntu Mono, monospace'},'P'+(j+1)));pfs.appendChild(g);}}
+      if(pf>=2&&li===0){const qx=264+4*70+31;
+        for(let j=0;j<3;j++){const x=160+j*32+13;pfs.appendChild(el('path',{d:'M'+qx+' '+(y+16)+' Q '+((qx+x)/2)+' '+(y-16)+' '+x+' '+(y+16),fill:'none',stroke:PAL.prefix,'stroke-width':2,class:'flow'}));}
+        for(let i=0;i<4;i++){const x=264+i*70+31;pfs.appendChild(el('path',{d:'M'+qx+' '+(y+16)+' Q '+((qx+x)/2)+' '+(y-4)+' '+x+' '+(y+16),fill:'none',stroke:'#55617a','stroke-width':1.2}));}}
+    });
+    document.getElementById('pfPrev').disabled=pf===0;document.getElementById('pfNext').disabled=pf===3;
+  }
+  function stopPlay(){clearInterval(pfTimer);pfTimer=null;document.getElementById('pfPlay').textContent='▶ Play';}
+  document.getElementById('pfNext').addEventListener('click',()=>{stopPlay();if(pf<3){pf++;drawPf(true);}});
+  document.getElementById('pfPrev').addEventListener('click',()=>{stopPlay();if(pf>0){pf--;drawPf(false);}});
+  document.getElementById('pfPlay').addEventListener('click',()=>{if(pfTimer){stopPlay();return;}pf=0;drawPf(false);document.getElementById('pfPlay').textContent='■ Stop';pfTimer=setInterval(()=>{if(pf<3){pf++;drawPf(true);}else stopPlay();},1700);});
+  document.querySelectorAll('.pfstep').forEach(b=>b.addEventListener('click',()=>{stopPlay();const k=+b.dataset.s,fw=k>pf;pf=k;drawPf(fw);}));
+  drawPf(false);
+  hooks.pf=()=>{stopPlay();pf=0;drawPf(false);};
+
+  // Picker
+  const ans={gpu:'16',model:'7',tasks:'one'};
+  function pick(){
+    const out=document.getElementById('pickOut');const g=+ans.gpu,m=+ans.model;let rec,why,col;
+    const loraNeed=m<=1?6:m<=7?18:150,qNeed=m<=1?3:m<=7?7:46;
+    if(ans.tasks==='many'&&g>=loraNeed*0.9&&m<=7){rec='Prefix-Tuning or LoRA adapters';col=PAL.prefix;why='Prefix-Tuning can mix tasks in one batch on one frozen model; swappable LoRA adapters are the more robust alternative.';}
+    else if(g>=loraNeed){rec='LoRA';col=PAL.lora;why='The 16-bit base fits, so skip quantization: faster training and simpler merging.';}
+    else if(g>=qNeed){rec='QLoRA';col=PAL.qlora;why='The 16-bit base will not fit; a 4-bit NF4 base with LoRA on all linear layers does.';}
+    else{rec='QLoRA on a smaller model';col=PAL.qlora;why='Even 4-bit does not fit this model on this GPU; drop to a smaller model or rent a larger GPU.';}
+    out.innerHTML='<span style="display:inline-block;animation:rise .5s cubic-bezier(.16,1,.3,1) both"><b style="color:'+col+';font-size:26px;font-family:Merriweather,serif;text-shadow:0 0 14px '+col+'">'+rec+'</b><br><span style="font-size:16px;color:#cdd5e2;font-weight:300">'+why+'</span></span>';
+  }
+  document.querySelectorAll('.pk').forEach(b=>{if(ans[b.dataset.q]===b.dataset.v)b.classList.add('on');b.addEventListener('click',()=>{ans[b.dataset.q]=b.dataset.v;document.querySelectorAll('.pk[data-q="'+b.dataset.q+'"]').forEach(x=>x.classList.toggle('on',x===b));pick();});});
+  pick();
+
+  show(fromHash());
+})();
+</script>
+</body>
+</html>
