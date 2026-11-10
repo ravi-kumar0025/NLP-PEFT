@@ -130,6 +130,13 @@ table.cmp td{color:#cfdcef;font-weight:300}table.cmp td:first-child{color:var(--
 .pfstep.on b{color:var(--prefix)}
 .pfstep.on span{color:#dde3ec}
 .pfstep:focus-visible{outline:3px solid var(--qlora);outline-offset:2px}
+.pc h4{font-family:var(--mono);font-size:14px;letter-spacing:.14em;text-transform:uppercase;margin:14px 0 6px;font-weight:700}
+.pc .pro-h{color:#5ef0a6}.pc .con-h{color:#ff7a6b}
+.pc ul{list-style:none;padding:0;margin:0}
+.pc li{position:relative;padding-left:24px;margin:6px 0}
+.pc li::before{position:absolute;left:2px;top:-1px;font-family:var(--mono);font-weight:700;font-size:19px}
+.pc .pro li::before{content:"+";color:#5ef0a6}
+.pc .con li::before{content:"\2212";color:#ff7a6b}
 /* act cards */
 .act{justify-content:center}
 .act svg text.inktext{font-family:"Merriweather",Georgia,serif}
@@ -160,9 +167,9 @@ svg text{font-family:var(--body)}
       </svg>
       <p class="lead words" style="font-size:24px;color:#cdd5e2">A comparative analysis of LoRA, QLoRA and Prefix-Tuning for resource-constrained environments</p>
       <div class="row rv" style="gap:12px;margin-top:18px;flex-wrap:nowrap">
-        <div class="card" style="flex:1;border-top:3px solid var(--lora)"><div class="tag">I · LoRA</div><h3 style="margin-top:8px" contenteditable="true">Member 1</h3></div>
-        <div class="card" style="flex:1;border-top:3px solid var(--qlora)"><div class="tag">II · QLoRA</div><h3 style="margin-top:8px" contenteditable="true">Member 2</h3></div>
-        <div class="card" style="flex:1;border-top:3px solid var(--prefix)"><div class="tag">III · Prefix</div><h3 style="margin-top:8px" contenteditable="true">Member 3</h3></div>
+        <div class="card" style="flex:1;border-top:3px solid var(--lora)"><div class="tag">I · LoRA</div><h3 style="margin-top:8px;white-space:nowrap">Ravi Kumar</h3><div class="mono" style="font-size:15px;color:var(--mute);letter-spacing:.06em">2401AI51</div></div>
+        <div class="card" style="flex:1;border-top:3px solid var(--qlora)"><div class="tag">II · QLoRA</div><h3 style="margin-top:8px;white-space:nowrap">Raghav Sawhney</h3><div class="mono" style="font-size:15px;color:var(--mute);letter-spacing:.06em">2401AI50</div></div>
+        <div class="card" style="flex:1;border-top:3px solid var(--prefix)"><div class="tag">III · Prefix</div><h3 style="margin-top:8px;white-space:nowrap">Ved Tejani</h3><div class="mono" style="font-size:15px;color:var(--mute);letter-spacing:.06em">2401AI52</div></div>
       </div>
     </div>
     <svg viewBox="0 0 380 380" width="100%" role="img" aria-label="A large weight matrix approximated by two thin matrices">
@@ -328,9 +335,8 @@ svg text{font-family:var(--body)}
       <rect class="ink bloom" style="--d:1.5s;color:#3fe0c5" x="670" y="4" width="170" height="38" fill="none" stroke="#3fe0c5" stroke-width="2"/>
       <text x="755" y="29" text-anchor="middle" font-size="16" font-weight="700" fill="#3fe0c5" font-family="Ubuntu Mono, monospace">LoRA B, A · bf16</text>
       <path class="flow" d="M755 44V58" stroke="#3fe0c5" stroke-width="2"/>
-      <circle r="7" fill="#ffd23f" class="bloom" style="color:#ffd23f"><animateMotion dur="2.6s" repeatCount="indefinite" path="M135 105H465H755H975"/></circle>
-      <circle r="5" fill="#3fe0c5" class="bloom" style="color:#3fe0c5"><animateMotion dur="2.6s" begin="1.3s" repeatCount="indefinite" path="M135 105H465H755H975"/></circle>
-      <circle r="6" fill="#ff6b8b" class="bloom" style="color:#ff6b8b"><animateMotion dur="2.2s" repeatCount="indefinite" path="M975 178H755V44"/></circle>
+      <circle r="7" fill="#ffd23f" class="bloom" style="color:#ffd23f"><animateMotion dur="4s" repeatCount="indefinite" path="M135 105H465H755H975"/></circle>
+      <circle r="6" fill="#ff6b8b" class="bloom" style="color:#ff6b8b"><animateMotion dur="3.4s" repeatCount="indefinite" path="M975 178H755V44"/></circle>
       <path d="M975 178H760" stroke="#ff6b8b" stroke-width="1.5" stroke-dasharray="4 5" fill="none"/>
       <text x="420" y="184" text-anchor="middle" font-size="16" fill="#ff6b8b">Backward pass: gradients flow through the frozen 4-bit model and update only B and A</text>
     </svg>
@@ -458,6 +464,39 @@ svg text{font-family:var(--body)}
   </div>
 </section>
 
+<!-- PROS AND CONS -->
+<section class="slide" data-act="PROS &amp; CONS" data-time="0:40">
+  <div class="eyebrow rv"><span class="scr">Pros &amp; cons</span></div>
+  <h2>Each method gives something up: LoRA needs 16-bit memory, QLoRA <em>trades speed</em>, Prefix trades stability</h2>
+  <div class="grid pc" style="grid-template-columns:repeat(3,1fr);flex:1;align-items:stretch">
+    <div class="card rv" style="border-top:3px solid var(--lora)"><h3 style="color:var(--lora);font-size:24px">LoRA</h3>
+      <h4 class="pro-h">Pros</h4><ul class="pro">
+        <li>Matches full fine-tuning (GPT-3 175B)</li>
+        <li>Zero inference latency after merging</li>
+        <li>Tiny checkpoints: 35 MB instead of 350 GB</li></ul>
+      <h4 class="con-h">Cons</h4><ul class="con">
+        <li>Frozen base still in 16-bit: 14 GB at 7B</li>
+        <li>Rank r limits how much new knowledge fits</li></ul></div>
+    <div class="card rv" style="border-top:3px solid var(--qlora)"><h3 style="color:var(--qlora);font-size:24px">QLoRA</h3>
+      <h4 class="pro-h">Pros</h4><ul class="pro">
+        <li>Lowest memory: 65B on one 48 GB GPU, 7B on a free Colab T4</li>
+        <li>Matches 16-bit LoRA quality</li>
+        <li>Same small adapters as LoRA</li></ul>
+      <h4 class="con-h">Cons</h4><ul class="con">
+        <li>Slower training: dequantizes every step</li>
+        <li>Merging needs a 16-bit copy of the base</li></ul></div>
+    <div class="card rv" style="border-top:3px solid var(--prefix)"><h3 style="color:var(--prefix);font-size:24px">Prefix-Tuning</h3>
+      <h4 class="pro-h">Pros</h4><ul class="pro">
+        <li>Fewest trainable parameters: about 0.1%</li>
+        <li>Mix tasks in one batch on one frozen model</li>
+        <li>Beat fine-tuning in low-data settings</li></ul>
+      <h4 class="con-h">Cons</h4><ul class="con">
+        <li>Unstable to train without the MLP trick</li>
+        <li>Uses up context length on every call</li>
+        <li>Trails LoRA on large models</li></ul></div>
+  </div>
+</section>
+
 <!-- 15 COMPARISON + PICKER -->
 <section class="slide" data-act="VERDICT" data-time="0:55">
   <div class="eyebrow rv"><span class="scr">The verdict</span></div>
@@ -487,24 +526,6 @@ svg text{font-family:var(--body)}
       <div class="row"><button class="btn pk" type="button" data-q="tasks" data-v="one">One task</button><button class="btn pk" type="button" data-q="tasks" data-v="many">Many tasks, one model</button></div>
       <div id="pickOut" style="margin-top:12px;font-size:19px;line-height:1.4;min-height:80px"></div>
     </div>
-  </div>
-</section>
-
-<!-- 16 TAKEAWAYS -->
-<section class="slide" data-act="TAKEAWAYS" data-time="0:35">
-  <div class="eyebrow rv"><span class="scr">Takeaways</span></div>
-  <h2>PEFT puts large-model fine-tuning on a <em style="--accent:var(--qlora)">student GPU</em></h2>
-  <div class="grid" style="grid-template-columns:repeat(3,1fr)">
-    <div class="card rv" style="border-top:3px solid var(--lora)"><h3 style="color:var(--lora)">LoRA</h3><p>Low-rank updates match full fine-tuning, train 10,000× fewer parameters and add zero inference latency. The default choice.</p></div>
-    <div class="card rv" style="border-top:3px solid var(--qlora)"><h3 style="color:var(--qlora)">QLoRA</h3><p>A 4-bit NF4 base with LoRA on all linear layers: 65B on one 48 GB GPU, 7B on a free Colab T4.</p></div>
-    <div class="card rv" style="border-top:3px solid var(--prefix)"><h3 style="color:var(--prefix)">Prefix-Tuning</h3><p>Smallest per-task storage and batchable across tasks, but less stable, costs context, and trails LoRA at scale.</p></div>
-  </div>
-  <div class="card rv"><h3>Where the field went next</h3>
-    <ul>
-      <li><b>DoRA</b> (2024): magnitude + direction, LoRA on the direction: +3.7 avg on LLaMA-7B commonsense reasoning over LoRA</li>
-      <li><b>(IA)³ / T-Few</b> (2022): PEFT beat GPT-3 175B in-context learning (72.4% vs 66.6%) at ~1,000× lower inference compute</li>
-      <li><b>LoRA Without Regret</b> (2025): LoRA on all layers matches full fine-tuning on small-to-medium datasets, at ~10× the learning rate</li>
-    </ul>
   </div>
 </section>
 
